@@ -1,0 +1,354 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>VoltSense | Battery Health Monitor</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <a href="/" class="brand">
+            <span class="brand-icon">V</span>
+            <span>
+                VoltSense
+                <small>BATTERY INTELLIGENCE</small>
+            </span>
+        </a>
+
+        <p class="nav-heading">WORKSPACE</p>
+
+        <a href="#overview" class="nav-link active">▦ &nbsp; Overview</a>
+        <a href="#predict" class="nav-link">⌁ &nbsp; SOH Prediction</a>
+        <a href="#performance" class="nav-link">▤ &nbsp; Model Performance</a>
+
+        <div class="sidebar-bottom">
+            <div class="status-dot"></div>
+            <div>
+                <strong>Prediction Engine</strong>
+                <small>Saved model loaded</small>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- HEADER -->
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">BATTERY ANALYTICS / DASHBOARD</p>
+                <h1>EV Battery Health Monitor</h1>
+                <p class="subtitle">
+                    Predict battery State of Health using machine learning.
+                </p>
+            </div>
+
+            <div class="top-tag">
+                <span></span> SYSTEM READY
+            </div>
+        </header>
+
+        <!-- OVERVIEW -->
+        <section id="overview" class="stats-grid">
+
+            <div class="stat-card">
+                <div class="stat-label">MODEL</div>
+                <div class="stat-value">RF</div>
+                <p>Random Forest Regression</p>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">PREDICTION TARGET</div>
+                <div class="stat-value">SOH<span>%</span></div>
+                <p>Estimated battery State of Health</p>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">MODEL STATUS</div>
+                <div class="stat-value">Ready</div>
+                <p>Using saved model files</p>
+            </div>
+
+        </section>
+
+        <!-- PREDICTION WORKSPACE -->
+        <section id="predict" class="workspace-grid">
+
+            <!-- INPUT FORM -->
+            <div class="panel form-panel">
+
+                <div class="panel-heading">
+                    <div class="heading-icon">⌁</div>
+                    <div>
+                        <h2>Battery Parameters</h2>
+                        <p>Enter the battery measurements below.</p>
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="alert-error">{{ error }}</div>
+                {% endif %}
+
+                <form method="POST" action="/">
+
+                    <div class="form-section-title">
+                        BATTERY INFORMATION
+                    </div>
+
+                    <div class="form-grid">
+
+                        <!-- MANUFACTURER -->
+                        <div class="field">
+                            <label for="manufacturer">Manufacturer</label>
+
+                            <select id="manufacturer"
+                                    name="manufacturer"
+                                    required>
+
+                                <option value=""
+                                        disabled
+                                        {% if not form.manufacturer %}selected{% endif %}>
+                                    Select Manufacturer
+                                </option>
+
+                                {% for item in manufacturers %}
+                                <option value="{{ item }}"
+                                    {% if form.manufacturer == item %}selected{% endif %}>
+                                    {{ item }}
+                                </option>
+                                {% endfor %}
+
+                            </select>
+                        </div>
+
+                        <!-- CHEMISTRY TYPE -->
+                        <div class="field">
+                            <label for="chemistry_type">Chemistry Type</label>
+
+                            <select id="chemistry_type"
+                                    name="chemistry_type"
+                                    required>
+
+                                <option value=""
+                                        disabled
+                                        {% if not form.chemistry_type %}selected{% endif %}>
+                                    Select Chemistry Type
+                                </option>
+
+                                {% for item in chemistries %}
+                                <option value="{{ item }}"
+                                    {% if form.chemistry_type == item %}selected{% endif %}>
+                                    {{ item }}
+                                </option>
+                                {% endfor %}
+
+                            </select>
+                        </div>
+
+                        <!-- NUMERIC INPUT FIELDS -->
+                        {% set fields = [
+                            ('nominal_capacity_Ah', 'Nominal Capacity', 'Ah', '0.01'),
+                            ('nominal_voltage_V', 'Nominal Voltage', 'V', '0.01'),
+                            ('cycle_number', 'Cycle Number', 'cycles', '1'),
+                            ('voltage_V', 'Measured Voltage', 'V', '0.01'),
+                            ('current_A', 'Current', 'A', '0.01'),
+                            ('c_rate', 'C-Rate', 'C', '0.01'),
+                            ('state_of_charge_%', 'State of Charge', '%', '1'),
+                            ('depth_of_discharge_%', 'Depth of Discharge', '%', '1'),
+                            ('cell_temperature_C', 'Cell Temperature', '°C', '0.1'),
+                            ('internal_resistance_mOhm', 'Internal Resistance', 'mΩ', '0.1')
+                        ] %}
+
+                        {% for name, label, unit, step in fields %}
+                        <div class="field">
+
+                            <label for="{{ name }}">
+                                {{ label }}
+                            </label>
+
+                            <div class="input-wrap">
+                                <input
+                                    id="{{ name }}"
+                                    name="{{ name }}"
+                                    type="number"
+                                    step="{{ step }}"
+                                    value="{{ form[name] }}"
+                                    placeholder="Enter {{ label|lower }}"
+                                    required>
+
+                                <span>{{ unit }}</span>
+                            </div>
+
+                        </div>
+                        {% endfor %}
+
+                    </div>
+
+                    <button type="submit" class="predict-button">
+                        Predict Battery Health <span>→</span>
+                    </button>
+
+                    <p class="form-note">
+                        Predictions are estimates from the trained model,
+                        not a certified battery diagnostic.
+                    </p>
+
+                </form>
+            </div>
+
+            <!-- PREDICTION RESULT -->
+            <div class="panel result-panel">
+
+                <div class="panel-heading">
+                    <div class="heading-icon result-icon">◉</div>
+                    <div>
+                        <h2>Prediction Result</h2>
+                        <p>Your battery health assessment</p>
+                    </div>
+                </div>
+
+                {% if result %}
+
+                <div class="result-content">
+
+                    <p class="result-overline">
+                        PREDICTED STATE OF HEALTH
+                    </p>
+
+                    <div class="soh-number">
+                        {{ "%.2f"|format(result.soh) }}<span>%</span>
+                    </div>
+
+                    <div class="progress-track">
+                        <div class="progress-fill"
+                             style="width: {{ result.soh }}%">
+                        </div>
+                    </div>
+
+                    <div class="result-status
+                        {% if result.status == 'Healthy' %}healthy
+                        {% elif result.status == 'Moderate' %}moderate
+                        {% else %}low{% endif %}">
+
+                        <span></span>
+                        {{ result.status }} Range
+                    </div>
+
+                    <div class="result-divider"></div>
+
+                    <h3>Assessment</h3>
+
+                    <p class="guidance">
+                        {{ result.guidance }}
+                    </p>
+
+                    <div class="insight-box">
+                        <strong>Model output</strong>
+                        <p>
+                            Raw prediction:
+                            {{ "%.3f"|format(result.raw_soh) }}%.
+                            The displayed value is limited to the
+                            0–100% range.
+                        </p>
+                    </div>
+
+                    <button class="secondary-button"
+                            type="button"
+                            onclick="window.print()">
+                        Print Assessment
+                    </button>
+
+                </div>
+
+                {% else %}
+
+                <!-- EMPTY RESULT STATE -->
+                <div class="empty-state">
+
+                    <div class="battery-illustration">
+                        <div class="battery-head"></div>
+                        <div class="battery-body">
+                            <div class="battery-level"></div>
+                        </div>
+                    </div>
+
+                    <h3>Awaiting Battery Data</h3>
+
+                    <p>
+                        Enter the battery parameters and select
+                        <strong>Predict Battery Health</strong> to view
+                        the estimated State of Health.
+                    </p>
+
+                    <div class="empty-tip">
+                        <span>✦</span> Results will appear here
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+                <div class="result-footer">
+                    <span class="status-dot"></span>
+                    Powered by Random Forest Regression
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- MODEL PERFORMANCE -->
+        <section id="performance" class="panel performance-panel">
+
+            <div>
+                <h2>Model Performance</h2>
+                <p>
+                    Evaluation metrics are not recalculated when this
+                    website starts. The displayed metrics are from the
+                    recorded held-out test results.
+                </p>
+            </div>
+
+            <div class="metric-row">
+
+                <div>
+                    <span>R² Score</span>
+                    <strong>99.99989%</strong>
+                </div>
+
+                <div>
+                    <span>MAE</span>
+                    <strong>0.00298</strong>
+                </div>
+
+                <div>
+                    <span>Algorithm</span>
+                    <strong>Random Forest</strong>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- FOOTER -->
+        <footer>
+            <span>VoltSense © 2026</span>
+            <span>
+                EV Battery State of Health Prediction · Machine Learning
+            </span>
+        </footer>
+
+    </main>
+</div>
+
+</body>
+</html>
